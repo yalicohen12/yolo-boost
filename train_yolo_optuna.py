@@ -203,7 +203,7 @@ class YOLOOptunaTrainer:
                               'yolov8n.pt': 1.0, 'yolov8s.pt': 0.8, 'yolov8m.pt': 0.6,
                               'yolov8l.pt': 0.4, 'yolov8x.pt': 0.2}.get(model_name, 0.5)
 
-            # Log metrics to MLflow
+            # Log metrics to MLflow (individual trial)
             mlflow.log_metrics({
                 'mAP50': map50,
                 'mAP50_95': map50_95,
@@ -211,6 +211,13 @@ class YOLOOptunaTrainer:
                 'recall': recall,
                 'speed_score': model_size_score,
             })
+
+            # Store metrics in trial attributes for parent run logging
+            trial.set_user_attr('mAP50', map50)
+            trial.set_user_attr('mAP50_95', map50_95)
+            trial.set_user_attr('precision', precision)
+            trial.set_user_attr('recall', recall)
+            trial.set_user_attr('speed_score', model_size_score)
 
             # Log model artifacts
             model_path = Path(f'runs/optuna/{self.run_name}/trial_{trial.number}/weights/best.pt')
@@ -257,11 +264,14 @@ class YOLOOptunaTrainer:
         )
 
         # Create parent MLflow run for the entire study
-        with mlflow.start_run(run_name=f"{study_name}_{self.run_name}"):
+        with mlflow.start_run(run_name=f"{study_name}_{self.run_name}") as parent_run:
             mlflow.log_param('study_name', study_name)
             mlflow.log_param('n_trials', n_trials)
             mlflow.log_param('run_name', self.run_name)
             mlflow.log_param('optimization_metric', self.optimization_metric)
+
+            # Store parent run ID for logging trial metrics
+            self._parent_run_id = parent_run.info.run_id
 
             # Run optimization (each trial creates nested run)
             study.optimize(
@@ -272,6 +282,17 @@ class YOLOOptunaTrainer:
             # Log best results to parent run
             mlflow.log_metric('best_value', study.best_value)
             mlflow.log_params({f'best_{k}': v for k, v in study.best_params.items()})
+
+            # Log all trial metrics to parent for comparison (prevents aggregation)
+            for trial_num in range(n_trials):
+                if trial_num < len(study.trials):
+                    trial = study.trials[trial_num]
+                    # Log trial-specific metrics with step number
+                    mlflow.log_metric('mAP50', trial.user_attrs.get('mAP50', 0), step=trial_num)
+                    mlflow.log_metric('mAP50-95', trial.user_attrs.get('mAP50_95', 0), step=trial_num)
+                    mlflow.log_metric('precision', trial.user_attrs.get('precision', 0), step=trial_num)
+                    mlflow.log_metric('recall', trial.user_attrs.get('recall', 0), step=trial_num)
+                    mlflow.log_metric('speed_score', trial.user_attrs.get('speed_score', 0), step=trial_num)
 
         # Print best results
         print('\n' + '='*50)

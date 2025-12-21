@@ -93,9 +93,8 @@ def main():
     if args.trials is None:
         args.trials = 20
 
-    # Use study name as experiment name if not specified
-    if args.experiment is None:
-        args.experiment = args.study_name
+    # Don't override experiment - let trainer read from .env
+    # (Only use study_name if user explicitly passes --experiment)
 
     # Create trainer first to get run_name
     trainer = YOLOOptunaTrainer(
