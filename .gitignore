@@ -1,0 +1,187 @@
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+coco8/
+# ============================================================================
+# Virtual Environments
+# ============================================================================
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# ============================================================================
+# YOLO Training Outputs
+# ============================================================================
+runs/
+weights/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+
+# Keep example runs folder structure (optional)
+# !runs/.gitkeep
+
+# ============================================================================
+# MLflow
+# ============================================================================
+mlruns/
+mlartifacts/
+
+# ============================================================================
+# Optuna
+# ============================================================================
+*.db
+optuna_study.db
+.optuna/
+
+# ============================================================================
+# Configuration & Secrets
+# ============================================================================
+.env
+.env.local
+.env.*.local
+
+# Keep example config
+!.env.example
+
+# ============================================================================
+# Generated/Output Files
+# ============================================================================
+best_hyperparameters.yaml
+results.csv
+*.log
+*.out
+
+# Data files (uncomment if you don't want to track datasets)
+# data.yaml
+# datasets/
+# data/
+
+# ============================================================================
+# IDE & Editors
+# ============================================================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# Operating System
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================================================
+# Jupyter Notebook
+# ============================================================================
+.ipynb_checkpoints/
+*.ipynb
+
+# Keep example notebooks (optional)
+# !examples/*.ipynb
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ============================================================================
+# Documentation Build
+# ============================================================================
+docs/_build/
+site/
+
+# ============================================================================
+# Temporary Files
+# ============================================================================
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# ============================================================================
+# Model Checkpoints & Large Files
+# ============================================================================
+checkpoints/
+*.ckpt
+*.safetensors
+
+# ============================================================================
+# User-Specific (Team members' personal files)
+# ============================================================================
+# Uncomment these if team members create personal experiment folders
+# experiments/
+# sandbox/
+# scratch/
+# test_runs/
+
+# ============================================================================
+# Git LFS (if you decide to track large files)
+# ============================================================================
+# Uncomment if using Git LFS
+# *.psd filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,20 @@
+# YOLO and Computer Vision
+ultralytics
+opencv-python
+torch
+torchvision
+
+# Hyperparameter Optimization
+optuna
+optuna-integration
+
+# Experiment Tracking
+mlflow
+
+# Utilities
+pyyaml
+numpy
+pandas
+matplotlib
+seaborn
+python-dotenv
