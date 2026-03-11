@@ -43,8 +43,10 @@ Examples:
                         help='Number of optimization trials')
     parser.add_argument('--epochs', type=int, default=None,
                         help='Number of epochs per trial')
-    parser.add_argument('--mlflow-uri', type=str, default='http://localhost:5000',
-                        help='MLflow tracking URI')
+    parser.add_argument('--patience', type=int, default=None,
+                        help='Early stopping patience (epochs without improvement)')
+    parser.add_argument('--mlflow-uri', type=str, default=None,
+                        help='MLflow tracking URI (default: ./mlruns local storage, no server needed)')
     parser.add_argument('--experiment', type=str, default=None,
                         help='MLflow experiment name (default: same as study-name)')
     parser.add_argument('--study-name', type=str, default='yolo-optimization',
@@ -86,8 +88,16 @@ def main():
 
         # Set env vars for preset (will be used by trainer if not overridden)
         os.environ['BATCH_OPTIONS'] = preset.get('batch_options', '8,16,32')
-        os.environ['IMGSZ_OPTIONS'] = preset.get('imgsz_options', '320,416,512,640')
-        os.environ['EPOCHS_RANGE'] = f"{preset['epochs']},{preset['epochs']}"
+        os.environ['EPOCHS'] = str(preset['epochs'])
+        os.environ['PATIENCE'] = str(preset.get('patience', '50'))
+        if preset.get('search_params'):
+            os.environ['SEARCH_PARAMS'] = preset['search_params']
+
+    # CLI overrides for epochs/patience take priority over preset env vars
+    if args.epochs is not None:
+        os.environ['EPOCHS'] = str(args.epochs)
+    if args.patience is not None:
+        os.environ['PATIENCE'] = str(args.patience)
 
     # Set defaults if still None
     if args.trials is None:
@@ -118,7 +128,7 @@ def main():
         print(f'Model: {args.model if args.model else "from .env (first in list)"}')
         print(f'Data: {args.data}')
         print(f'Epochs: {args.epochs if args.epochs else "from .env"}')
-        print(f'MLflow URI: {args.mlflow_uri}')
+        print(f'MLflow URI: {trainer.mlflow_tracking_uri}')
         print(f'Experiment: {args.experiment}')
         print(f'Device: {args.device if args.device else "from .env"}')
         print('='*70)
@@ -132,7 +142,8 @@ def main():
         )
 
         print('\nBaseline training complete!')
-        print(f'View results in MLflow UI at: {args.mlflow_uri}')
+        print(f'MLflow tracking: {trainer.mlflow_tracking_uri}')
+        print('Run "mlflow ui" to view results in browser.')
         return
 
     # Regular optimization mode
@@ -147,7 +158,7 @@ def main():
     print(f'Trials: {args.trials}')
     print(f'Epochs per trial: {args.epochs if args.epochs else "from .env"}')
     print(f'Optimization metric: {args.optimization_metric if args.optimization_metric else "from .env"}')
-    print(f'MLflow URI: {args.mlflow_uri}')
+    print(f'MLflow URI: {trainer.mlflow_tracking_uri}')
     print(f'Experiment: {args.experiment}')
     print(f'Study Name: {args.study_name}')
     print(f'Storage: {args.storage}')
@@ -164,7 +175,8 @@ def main():
     )
 
     print('\nOptimization complete!')
-    print(f'View results in MLflow UI at: {args.mlflow_uri}')
+    print(f'MLflow tracking: {trainer.mlflow_tracking_uri}')
+    print('Run "mlflow ui" to view results in browser.')
 
 
 if __name__ == '__main__':

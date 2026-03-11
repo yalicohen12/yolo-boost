@@ -7,6 +7,7 @@ torchvision
 # Hyperparameter Optimization
 optuna
 optuna-integration
+plotly  # For Optuna visualization plots (logged to MLflow)
 
 # Experiment Tracking
 mlflow
@@ -18,3 +19,4 @@ pandas
 matplotlib
 seaborn
 python-dotenv
+Pillow  # For auto-detecting image sizes from dataset
