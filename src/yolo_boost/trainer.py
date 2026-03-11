@@ -7,8 +7,18 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.rule import Rule
+
+console = Console()
+
+# Load yolo-boost specific env file from CWD, falling back to plain .env
+# Using Path.cwd() explicitly because load_dotenv() may not resolve relative
+# paths correctly when invoked as an installed CLI entry point.
+_cwd = Path.cwd()
+load_dotenv(_cwd / '.env.yolo-boost') or load_dotenv(_cwd / '.env')
 
 # Disable Ultralytics' built-in MLflow integration — it conflicts with our setup
 # by registering its own callbacks on the Trainer and trying to write to /mlflow
@@ -102,7 +112,7 @@ def auto_detect_image_size(data_yaml_path):
                 break
 
         if image_file is None:
-            print(f"Warning: No images found in {train_images_path}, using default size 640")
+            console.print(f"[yellow]Warning:[/yellow] No images found in {train_images_path}, using default size 640")
             return 640
 
         # Read image dimensions
@@ -113,11 +123,11 @@ def auto_detect_image_size(data_yaml_path):
             # Round to nearest 32 (YOLO requirement)
             imgsz = ((max_dim + 31) // 32) * 32
 
-            print(f"Auto-detected image size from {image_file.name}: {width}x{height} -> using {imgsz}")
+            console.print(f"[dim]Auto-detected image size from {image_file.name}: {width}×{height} → using {imgsz}[/dim]")
             return imgsz
 
     except Exception as e:
-        print(f"Warning: Could not auto-detect image size ({e}), using default 640")
+        console.print(f"[yellow]Warning:[/yellow] Could not auto-detect image size ({e}), using default 640")
         return 640
 
 
@@ -377,7 +387,7 @@ class YOLOOptunaTrainer:
                 erasing=erasing,
                 bgr=bgr,
                 close_mosaic=close_mosaic,
-                project=f'runs/optuna/{self.run_name}',
+                project=str(Path.cwd() / 'runs' / 'optuna' / self.run_name),
                 name=f'trial_{trial.number}',
                 exist_ok=False,
                 verbose=True,
@@ -424,7 +434,7 @@ class YOLOOptunaTrainer:
             trial.set_user_attr('speed_score', speed_score)
 
             # Log model weights
-            trial_dir = Path(f'runs/optuna/{self.run_name}/trial_{trial.number}')
+            trial_dir = Path.cwd() / 'runs' / 'optuna' / self.run_name / f'trial_{trial.number}'
             model_path = trial_dir / 'weights' / 'best.pt'
             if model_path.exists():
                 self._safe_log_artifact(model_path, artifact_path='weights')
@@ -546,21 +556,27 @@ class YOLOOptunaTrainer:
             self._log_optuna_plots(study)
 
         # Print best results
-        print('\n' + '='*50)
-        print('Optimization completed!')
-        print('='*50)
-        print(f'Trials completed: {n_complete}  |  Pruned (saved compute): {n_pruned}')
-        print(f'Best trial: {study.best_trial.number}')
-        print(f'Best {self.optimization_metric}: {study.best_value:.4f}')
-        print('\nBest hyperparameters:')
+        params_table = Table(show_header=True, header_style="bold cyan", box=None, padding=(0, 2))
+        params_table.add_column("Parameter", style="cyan", no_wrap=True)
+        params_table.add_column("Value", style="green")
         for key, value in study.best_params.items():
-            print(f'  {key}: {value}')
+            params_table.add_row(key, f"{value:.6f}" if isinstance(value, float) else str(value))
+
+        console.print(Panel(
+            f"[bold]Trials completed:[/bold] {n_complete}  |  "
+            f"[bold]Pruned (saved compute):[/bold] {n_pruned}\n"
+            f"[bold]Best trial:[/bold] {study.best_trial.number}  |  "
+            f"[bold]Best {self.optimization_metric}:[/bold] [green]{study.best_value:.4f}[/green]",
+            title="[bold green] Optimization Complete [/bold green]",
+            border_style="green",
+        ))
+        console.print(params_table)
 
         # Save best hyperparameters
-        best_params_path = Path('best_hyperparameters.yaml')
+        best_params_path = Path.cwd() / 'best_hyperparameters.yaml'
         with open(best_params_path, 'w') as f:
             yaml.dump(study.best_params, f, default_flow_style=False)
-        print(f'\nBest hyperparameters saved to {best_params_path}')
+        console.print(f"\n[dim]Best hyperparameters saved to {best_params_path}[/dim]")
 
         return study
 
@@ -576,8 +592,10 @@ class YOLOOptunaTrainer:
             mlflow.log_artifact(str(local_path), artifact_path=artifact_path)
         except PermissionError:
             if not getattr(self, '_artifact_warning_shown', False):
-                print('\nNote: Binary artifact upload skipped (weights, plots). '
-                      'To enable, restart MLflow with: mlflow server --serve-artifacts\n')
+                console.print(
+                    '\n[yellow]Note:[/yellow] Binary artifact upload skipped (weights, plots). '
+                    'To enable, restart MLflow with: [bold]mlflow server --serve-artifacts[/bold]\n'
+                )
                 self._artifact_warning_shown = True
 
     def _trial_callback(self, study, trial):
@@ -585,21 +603,35 @@ class YOLOOptunaTrainer:
         n_complete = sum(1 for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE)
         if trial.state == optuna.trial.TrialState.COMPLETE:
             is_best = trial.value == study.best_value
-            marker = '  ← NEW BEST' if is_best else f'  (best so far: {study.best_value:.4f})'
-            print(f'\n{"─"*60}')
-            print(f'  Trial {trial.number} done  |  score: {trial.value:.4f}{marker}')
-            print(f'  mAP50-95={trial.user_attrs.get("mAP50_95", 0):.4f}  '
-                  f'mAP50={trial.user_attrs.get("mAP50", 0):.4f}  '
-                  f'F1={trial.user_attrs.get("f1", 0):.4f}  '
-                  f'inference={trial.user_attrs.get("inference_ms", 0):.1f}ms')
-            print(f'  model={trial.params.get("model_version", "?")}  '
-                  f'optimizer={trial.params.get("optimizer", "?")}  '
-                  f'lr0={trial.params.get("lr0", 0):.5f}  '
-                  f'batch={trial.params.get("batch", "?")}')
-            print(f'  completed: {n_complete} trials')
-            print(f'{"─"*60}')
+            if is_best:
+                console.print(Rule(
+                    f"[bold green]Trial {trial.number}  score: {trial.value:.4f}  ← NEW BEST[/bold green]",
+                    style="green",
+                ))
+            else:
+                console.print(Rule(
+                    f"Trial {trial.number}  score: {trial.value:.4f}  "
+                    f"[dim](best: {study.best_value:.4f})[/dim]",
+                    style="blue",
+                ))
+            console.print(
+                f"  [cyan]mAP50-95[/cyan]={trial.user_attrs.get('mAP50_95', 0):.4f}  "
+                f"[cyan]mAP50[/cyan]={trial.user_attrs.get('mAP50', 0):.4f}  "
+                f"[cyan]F1[/cyan]={trial.user_attrs.get('f1', 0):.4f}  "
+                f"[cyan]inference[/cyan]={trial.user_attrs.get('inference_ms', 0):.1f}ms"
+            )
+            console.print(
+                f"  [cyan]model[/cyan]={trial.params.get('model_version', '?')}  "
+                f"[cyan]optimizer[/cyan]={trial.params.get('optimizer', '?')}  "
+                f"[cyan]lr0[/cyan]={trial.params.get('lr0', 0):.5f}  "
+                f"[cyan]batch[/cyan]={trial.params.get('batch', '?')}"
+            )
+            console.print(f"  [dim]completed: {n_complete} trials[/dim]")
         elif trial.state == optuna.trial.TrialState.PRUNED:
-            print(f'\n  Trial {trial.number} pruned  |  best so far: {study.best_value:.4f}')
+            console.print(
+                f"  [yellow]Trial {trial.number} pruned[/yellow]  |  "
+                f"best so far: [green]{study.best_value:.4f}[/green]"
+            )
 
     def _log_optuna_plots(self, study):
         """Generate Optuna visualization plots and log to MLflow as HTML artifacts."""
@@ -622,10 +654,12 @@ class YOLOOptunaTrainer:
                     html_path = os.path.join(tmpdir, f'{name}.html')
                     fig.write_html(html_path)
                     self._safe_log_artifact(html_path, artifact_path='optuna_plots')
-            print('Optuna plots saved to MLflow under optuna_plots/')
+            console.print('[green]Optuna plots saved to MLflow under optuna_plots/[/green]')
         except Exception as e:
-            print(f'Warning: Could not generate Optuna plots ({e}). '
-                  f'Install plotly: pip install plotly')
+            console.print(
+                f'[yellow]Warning:[/yellow] Could not generate Optuna plots ({e}). '
+                f'Install plotly: [bold]pip install plotly[/bold]'
+            )
 
     def train_baseline(self, model_name=None, epochs=None):
         """
@@ -642,7 +676,7 @@ class YOLOOptunaTrainer:
         if epochs is None:
             epochs = self.epochs
 
-        print(f"\nRunning baseline training: {model_name}, {epochs} epochs\n")
+        console.print(f"\n[bold]Running baseline training:[/bold] [cyan]{model_name}[/cyan], {epochs} epochs\n")
 
         # Start parent MLflow run
         with mlflow.start_run(run_name=f"baseline_{self.run_name}"):
@@ -660,7 +694,7 @@ class YOLOOptunaTrainer:
                 data=self.data_yaml,
                 epochs=epochs,
                 device=self.device,
-                project=f'runs/optuna/{self.run_name}',
+                project=str(Path.cwd() / 'runs' / 'optuna' / self.run_name),
                 name='baseline',
                 exist_ok=False,
                 verbose=True,
@@ -682,35 +716,15 @@ class YOLOOptunaTrainer:
             })
 
             # Log model artifacts
-            model_path = Path(f'runs/optuna/{self.run_name}/baseline/weights/best.pt')
+            model_path = Path.cwd() / 'runs' / 'optuna' / self.run_name / 'baseline' / 'weights' / 'best.pt'
             if model_path.exists():
                 self._safe_log_artifact(model_path, artifact_path='weights')
 
-            print(f"\nBaseline Results:")
-            print(f"  mAP50: {map50:.4f}")
-            print(f"  mAP50-95: {map50_95:.4f}")
-            print(f"  Precision: {precision:.4f}")
-            print(f"  Recall: {recall:.4f}")
-
-
-def main():
-    """
-    Example usage of YOLOOptunaTrainer.
-    Model version/size is now automatically optimized by Optuna.
-    """
-    trainer = YOLOOptunaTrainer(
-        data_yaml='data.yaml',
-        mlflow_tracking_uri='http://localhost:5000',
-        experiment_name='yolo-optuna-boost',
-        model_versions=['yolo11n.pt', 'yolo11s.pt', 'yolo12n.pt', 'yolo12s.pt']
-    )
-
-    study = trainer.optimize(
-        n_trials=20,
-        study_name='yolo-optimization',
-        storage=None  # Use 'sqlite:///optuna_study.db' for persistent storage
-    )
-
-
-if __name__ == '__main__':
-    main()
+            console.print(Panel(
+                f"[cyan]mAP50[/cyan]:     {map50:.4f}\n"
+                f"[cyan]mAP50-95[/cyan]:  {map50_95:.4f}\n"
+                f"[cyan]Precision[/cyan]: {precision:.4f}\n"
+                f"[cyan]Recall[/cyan]:    {recall:.4f}",
+                title="[bold] Baseline Results [/bold]",
+                border_style="blue",
+            ))

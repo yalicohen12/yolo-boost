@@ -5,7 +5,7 @@ Configuration presets for common YOLO optimization scenarios.
 PRESETS = {
     'quick': {
         'description': 'Quick experiment - fast iterations for testing',
-        'n_trials': 5,
+        'n_trials': 3,
         'epochs': 10,
         'patience': 5,
         'models': ['yolo11n.pt', 'yolo11s.pt', 'yolo12n.pt', 'yolo12s.pt'],

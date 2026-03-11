@@ -1,0 +1,65 @@
+[build-system]
+# setuptools is the build backend — it knows how to turn your source into
+# an installable .whl file. "wheel" is a required helper for that process.
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "yolo-boost"
+version = "0.1.0"
+description = "Automated hyperparameter optimization for YOLO models using Optuna and MLflow"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+
+# These install automatically when someone does: pip install yolo-boost
+# Note: torch/torchvision are pulled in transitively by ultralytics,
+# so we don't pin them here — users pick their own CUDA-specific build.
+dependencies = [
+    "ultralytics>=8.0",
+    "optuna>=3.0",
+    "optuna-integration>=3.0",
+    "mlflow>=2.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "numpy>=1.24",
+    "pandas>=1.5",
+    "matplotlib>=3.6",
+    "seaborn>=0.12",
+    "Pillow>=9.0",
+    "plotly>=5.0",
+    "rich>=13.0",
+]
+
+keywords = ["yolo", "hyperparameter", "optimization", "optuna", "mlflow", "computer-vision"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+
+# This is the magic line — it creates the `yolo-boost` shell command.
+# Format: "command-name" = "package.module:function"
+# After install, typing `yolo-boost` anywhere calls cli.main()
+[project.scripts]
+yolo-boost = "yolo_boost.cli:main"
+
+
+[tool.setuptools.packages.find]
+# Tell setuptools to look for packages inside src/ instead of the root.
+# Without this, it would look in the root and not find yolo_boost.
+where = ["src"]
+
+
+[tool.setuptools.package-data]
+# Non-Python files to bundle with the package.
+# This is how .env.example gets included in the installed package
+# so that `yolo-boost init` can copy it to the user's CWD.
+yolo_boost = [".env.yolo-boost.example"]
