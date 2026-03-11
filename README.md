@@ -14,17 +14,37 @@ Automated hyperparameter optimization for YOLO models using Optuna (TPE) and MLf
 - **Auto Image Size** — reads your dataset and picks the right `imgsz` automatically
 - **Rich Terminal Output** — color-coded panels, trial summaries, and progress via `rich`
 
-## Quick Start
+## Installation
 
-### 1. Install
+### From GitLab (recommended)
 
 ```bash
+pip install git+https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+```
+
+### Local / development
+
+```bash
+git clone https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+cd yolo-boost
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-### 2. Scaffold config
+`-e` (editable) means changes to the source take effect immediately without reinstalling.
+
+After either install, the `yolo-boost` command is available in your environment:
+
+```bash
+yolo-boost --help
+```
+
+---
+
+## Quick Start
+
+### 1. Scaffold config
 
 ```bash
 yolo-boost init
