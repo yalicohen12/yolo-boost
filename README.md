@@ -5,11 +5,14 @@ Automated hyperparameter optimization for YOLO models using Optuna and MLflow tr
 ## Features
 
 - **Smart Hyperparameter Search**: Uses Optuna's TPE algorithm (not random/brute-force)
+- **YOLO11 & YOLO12 Support**: Automatically searches across model families and sizes (n/s/m/l/x)
+- **Trial Pruning**: MedianPruner kills underperforming trials early to save GPU time
+- **Focused Search Mode**: Reduce search space to 10 high-impact params for faster TPE convergence
 - **Multiple Optimization Targets**: Optimize for accuracy (mAP50-95), speed, or balanced performance
 - **Configuration Presets**: Quick-start templates for common use cases
-- **MLflow Integration**: Track all experiments with metrics, parameters, and artifacts
+- **Rich MLflow Tracking**: Per-epoch curves, study progression charts, Optuna HTML plots, system metrics
 - **Flexible Configuration**: Use presets, .env files, or command-line arguments
-- **Model Size Optimization**: Automatically finds the best YOLO model variant (n/s/m/l/x)
+- **Auto Image Size Detection**: Reads your dataset and picks the right `imgsz` automatically
 
 ## Quick Start
 
@@ -18,7 +21,7 @@ Automated hyperparameter optimization for YOLO models using Optuna and MLflow tr
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install ultralytics optuna mlflow python-dotenv
+pip install -r requirements.txt
 ```
 
 ### 2. Prepare Your Data
@@ -51,6 +54,9 @@ Edit `.env` to customize your setup (optional - presets work out of the box).
 ```bash
 # Quick experiment (5 trials, 10 epochs, fast models)
 python run_study.py --preset quick --data data.yaml
+
+# Focused search (10 highest-impact params, better TPE convergence)
+python run_study.py --preset focused --data data.yaml --device 0
 
 # Accuracy-focused (30 trials, larger models)
 python run_study.py --preset accuracy --data data.yaml --device 0
@@ -132,11 +138,12 @@ python run_study.py --list-presets
 
 | Preset | Trials | Epochs | Models | Best For |
 |--------|--------|--------|--------|----------|
-| **quick** | 5 | 10 | n, s | Quick testing, iteration |
-| **accuracy** | 30 | 50 | m, l, x | Maximum accuracy |
-| **speed** | 20 | 30 | n, s | Fast inference |
-| **balanced** | 25 | 40 | n, s, m | Production deployment |
-| **production** | 50 | 100 | n, s, m, l | Final optimization |
+| **quick** | 5 | 10 | yolo11n/s, yolo12n/s | Quick testing, iteration |
+| **focused** | 30 | 50 | yolo11n/s/m, yolo12n/s/m | Best TPE convergence (10 key params) |
+| **accuracy** | 30 | 50 | yolo11m/l/x, yolo12m/l/x | Maximum accuracy |
+| **speed** | 20 | 30 | yolo11n/s, yolo12n/s | Fast inference |
+| **balanced** | 25 | 40 | yolo11n/s/m, yolo12n/s/m | Production deployment |
+| **production** | 50 | 100 | yolo11n/s/m/l, yolo12n/s/m/l | Final optimization |
 
 ## Optimization Metrics
 
@@ -177,15 +184,19 @@ DEVICE=cpu  # or 0, 1, 2 for GPU
 
 # Optimization
 OPTIMIZATION_METRIC=mAP50-95
-MODEL_VERSIONS=yolo11n.pt,yolo11s.pt,yolo11m.pt,yolo11l.pt
+MODEL_VERSIONS=yolo11n.pt,yolo11s.pt,yolo11m.pt,yolo12n.pt,yolo12s.pt,yolo12m.pt
 
-# Training
-EPOCHS_RANGE=10,10  # Fixed 10 epochs (or 10,50 to optimize)
-BATCH_OPTIONS=8,16,32,64
-# IMGSZ_OPTIONS=320,416,512,640  # Commented = use defaults
+# Training (fixed per preset — not Optuna search params)
+EPOCHS=50
+PATIENCE=50
+BATCH_OPTIONS=8,16,32
+# Image size is auto-detected from your dataset — no need to set manually
+
+# Focused search: comma-separated list of params to search (leave blank = search all)
+# SEARCH_PARAMS=model_version,optimizer,batch,lr0,lrf,momentum,weight_decay,box,cls,mosaic
 
 # MLflow
-MLFLOW_TRACKING_URI=http://localhost:5000
+MLFLOW_TRACKING_URI=./mlruns  # or http://your-mlflow-server:5000
 MLFLOW_EXPERIMENT_NAME=yolo-optuna-boost
 
 # Optuna
@@ -202,15 +213,25 @@ Fine-tune search ranges in `.env`:
 # Learning Rate
 LR0_RANGE=1e-5,1e-1        # Initial learning rate
 LRF_RANGE=0.01,1.0         # Final learning rate fraction
+MOMENTUM_RANGE=0.8,0.99    # SGD momentum / Adam beta1
+WEIGHT_DECAY_RANGE=0.0,0.01
+
+# Warmup
+WARMUP_EPOCHS_RANGE=0,5
+WARMUP_BIAS_LR_RANGE=0.0,0.2
+
+# Loss Weights (calibrated for YOLO11/12 defaults)
+BOX_RANGE=1.0,20.0         # Box loss weight (YOLO11 default: 7.5)
+CLS_RANGE=0.1,4.0          # Classification loss weight (YOLO11 default: 0.5)
+DFL_RANGE=0.5,4.0          # DFL loss weight (YOLO11 default: 1.5)
 
 # Augmentation
 HSV_H_RANGE=0.0,0.1        # Hue augmentation
 DEGREES_RANGE=0.0,45.0     # Rotation degrees
+TRANSLATE_RANGE=0.0,0.5    # Translation fraction
 MOSAIC_RANGE=0.0,1.0       # Mosaic augmentation probability
-
-# Loss Weights
-BOX_RANGE=0.02,0.2         # Box loss weight
-CLS_RANGE=0.2,4.0          # Classification loss weight
+ERASING_RANGE=0.0,0.9      # Random erasing probability
+CLOSE_MOSAIC_RANGE=0,20    # Disable mosaic for last N epochs
 ```
 
 See `.env.example` for all available parameters.
@@ -221,18 +242,22 @@ See `.env.example` for all available parameters.
 python run_study.py [OPTIONS]
 
 Options:
-  --preset PRESET              Use preset (quick/accuracy/speed/balanced/production)
-  --list-presets              Show all presets
-  --data PATH                 Path to data.yaml (required)
-  --trials N                  Number of optimization trials
-  --epochs N                  Epochs per trial
-  --models MODEL [MODEL ...]  YOLO models to try (e.g., yolo11n.pt yolo11s.pt)
-  --device DEVICE             Training device (cpu, 0, 1, cuda:0, etc.)
-  --optimization-metric M     What to optimize (mAP50-95/mAP50/speed/balanced)
-  --mlflow-uri URI           MLflow tracking URI
-  --experiment NAME          MLflow experiment name
-  --study-name NAME          Optuna study name
-  --storage URI              Optuna storage (sqlite:///optuna.db for persistence)
+  --preset PRESET              Use preset (quick/focused/accuracy/speed/balanced/production)
+  --list-presets               Show all presets
+  --data PATH                  Path to data.yaml (required)
+  --trials N                   Number of optimization trials
+  --epochs N                   Epochs per trial
+  --patience N                 Early stopping patience (epochs without improvement)
+  --models MODEL [MODEL ...]   YOLO models to try (e.g., yolo11n.pt yolo12s.pt)
+  --device DEVICE              Training device (cpu, 0, 1, cuda:0, etc.)
+  --optimization-metric M      What to optimize (mAP50-95/mAP50/speed/balanced/precision/recall)
+  --mlflow-uri URI             MLflow tracking URI
+  --experiment NAME            MLflow experiment name
+  --study-name NAME            Optuna study name
+  --storage URI                Optuna storage (sqlite:///optuna.db for persistence)
+  --run-name NAME              Custom run name (default: auto timestamp)
+  --baseline                   Single training run with defaults (for comparison)
+  --model MODEL                Model for baseline run
 ```
 
 ## How It Works
@@ -259,21 +284,54 @@ Trial 3:  lr0=0.009, yolo11m → mAP50-95: 0.78  ✓ Converging...
 
 This converges to optimal parameters in **20-50 trials** vs. thousands for brute-force.
 
+### Pruning (Save Compute)
+
+**MedianPruner** kills underperforming trials early:
+- After 5 complete trials, compares each trial's per-epoch mAP50-95 against the median
+- If a trial is below median after its warmup (first 10 epochs), it's stopped immediately
+- Pruned trials are shown in the console and logged in MLflow — saved compute is reported at the end
+
+### Focused Search Mode
+
+With 28 hyperparameters, TPE needs many trials for good coverage. The **focused preset** reduces this to the 10 highest-impact parameters:
+
+```
+model_version, optimizer, batch, lr0, lrf, momentum, weight_decay, box, cls, mosaic
+```
+
+All other parameters stay at YOLO11/12 defaults. This gives TPE ~3x better coverage per trial. Enable for any preset:
+
+```bash
+python run_study.py --preset balanced --data data.yaml
+# In .env:
+SEARCH_PARAMS=model_version,optimizer,batch,lr0,lrf,momentum,weight_decay,box,cls,mosaic
+```
+
 ### What Gets Optimized
 
-**Automatically tuned:**
-- Model size (n/s/m/l/x variants)
-- Learning rates (lr0, lrf, momentum)
-- Batch size and image size
-- Data augmentation (HSV, rotation, mosaic, mixup, etc.)
-- Loss weights (box, cls, dfl)
+**Automatically tuned (28 parameters total):**
+- Model variant: YOLO11 and YOLO12 (n/s/m/l/x)
+- Optimizer: SGD, Adam, AdamW, NAdam
+- Learning rates: lr0, lrf, momentum, weight_decay
+- Warmup: warmup_epochs, warmup_momentum, warmup_bias_lr
+- Loss weights: box, cls, dfl
+- Regularization: label_smoothing
+- Augmentation — color: hsv_h, hsv_s, hsv_v
+- Augmentation — geometric: degrees, translate, scale, shear, perspective, flipud, fliplr
+- Augmentation — advanced: mosaic, mixup, copy_paste, erasing, bgr, close_mosaic
+- Batch size (categorical)
+
+**Image size** is auto-detected from your dataset — no tuning needed.
+
+**Fixed per preset** (not searched by Optuna): `epochs`, `patience`
 
 **Tracked in MLflow:**
-- mAP50, mAP50-95
-- Precision, Recall
-- Speed score (model size)
-- All hyperparameters
-- Best model weights
+- Per-epoch curves: mAP50, mAP50-95, precision, recall, box/cls/dfl loss
+- Final trial metrics: mAP50, mAP50-95, precision, recall, F1, inference ms
+- Study progression: `trial_mAP50_95` and `best_so_far` time-series on parent run
+- Optuna plots: optimization history, parameter importances, parallel coordinates, slice
+- System metrics: CPU, RAM, GPU utilization per run
+- All hyperparameters and best model weights
 
 ## Examples
 
@@ -367,12 +425,14 @@ All team members see the same study results and Optuna learns from everyone's tr
 Run MLflow on a shared server:
 
 ```bash
-# Server
-mlflow server --host 0.0.0.0 --port 5000
+# Server — use --serve-artifacts to enable weight/plot uploads from client machines
+mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts
 
 # Team members in .env
 MLFLOW_TRACKING_URI=http://mlflow-server:5000
 ```
+
+> **Note:** Without `--serve-artifacts`, artifact uploads (model weights, plots) are skipped with a warning. Metrics and parameters are always tracked regardless.
 
 ## Best Practices
 
@@ -400,7 +460,7 @@ python run_study.py --preset quick --epochs 5
 **Solution**: Increase epochs or adjust learning rate ranges
 ```bash
 # In .env
-EPOCHS_RANGE=30,50
+EPOCHS=50
 LR0_RANGE=1e-4,1e-2
 ```
 
@@ -410,11 +470,10 @@ LR0_RANGE=1e-4,1e-2
 
 ### Issue: Out of memory
 
-**Solution**: Reduce batch size or image size
+**Solution**: Reduce batch size options
 ```bash
 # In .env
 BATCH_OPTIONS=4,8
-IMGSZ_OPTIONS=320,416
 ```
 
 ## Run Organization
