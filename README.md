@@ -91,7 +91,7 @@ After only **20–50 trials**, TPE typically finds configurations that would req
 ### From GitLab (recommended)
 
 ```bash
-pip install git+https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+pip install git+https://github.com/yalicohen12/yolo-boost.git
 ```
 
 That's it. The `yolo-boost` command is now in your PATH.
@@ -99,7 +99,7 @@ That's it. The `yolo-boost` command is now in your PATH.
 ### Local / development install
 
 ```bash
-git clone https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+git clone https://github.com/yalicohen12/yolo-boost.git
 cd yolo-boost
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -335,7 +335,7 @@ Prefer a fully isolated environment with MLflow pre-wired? A `Dockerfile` and `d
 ### 1. Build
 
 ```bash
-git clone https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+git clone https://github.com/yalicohen12/yolo-boost.git
 cd yolo-boost
 docker compose build
 ```
