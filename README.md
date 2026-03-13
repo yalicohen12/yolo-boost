@@ -1,20 +1,92 @@
-# YOLO Boost
+<div align="center">
 
-Automated hyperparameter optimization for YOLO models using Optuna (TPE) and MLflow tracking.
+# yolo-boost
+
+**Automated hyperparameter optimization for YOLO object detection — smarter than grid search, faster than guessing.**
+
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![MLflow](https://img.shields.io/badge/tracking-MLflow-orange?logo=mlflow)](https://mlflow.org/)
+[![Optuna](https://img.shields.io/badge/search-Optuna%20TPE-blueviolet)](https://optuna.org/)
+[![Ultralytics](https://img.shields.io/badge/model-YOLO-black?logo=ultralytics)](https://docs.ultralytics.com/)
+
+</div>
+
+---
+
+`yolo-boost` wraps [Ultralytics YOLO](https://docs.ultralytics.com/) in an [Optuna](https://optuna.org/) TPE search loop.
+Instead of manually tuning hyperparameters, you run one command and let Bayesian optimization find the best configuration for your object detection dataset — with every trial tracked in MLflow.
+
+```
+yolo-boost run --preset accuracy --data data.yaml --device 0
+```
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Prerequisites](#prerequisites)
+- [Install as a Python Package](#install-as-a-python-package)
+- [Your First Run](#your-first-run)
+- [Presets](#presets)
+- [CLI Reference](#cli-reference)
+- [Configuration](#configuration)
+- [MLflow Dashboard](#mlflow-dashboard)
+- [Team Collaboration](#team-collaboration)
+- [Output Structure](#output-structure)
+- [Docker](#docker)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+---
 
 ## Features
 
-- **Smart Search (TPE)** — Optuna's Tree-structured Parzen Estimator, not random/grid search
-- **YOLO11 & YOLO12** — searches across model families and sizes (n/s/m/l/x)
-- **Trial Pruning** — MedianPruner kills underperforming trials early to save GPU time
-- **Focused Search Mode** — reduce to 10 high-impact params for faster TPE convergence
-- **Multiple Optimization Targets** — mAP50-95, mAP50, speed, balanced, precision, recall
-- **Configuration Presets** — quick-start templates for common use cases
-- **Rich MLflow Tracking** — per-epoch curves, study progression, Optuna HTML plots, system metrics
-- **Auto Image Size** — reads your dataset and picks the right `imgsz` automatically
-- **Rich Terminal Output** — color-coded panels, trial summaries, and progress via `rich`
+| | |
+|---|---|
+| **Bayesian search (TPE)** | Optuna's Tree-structured Parzen Estimator — not random or grid search |
+| **Object detection focused** | Built around YOLO's training pipeline, searches across model sizes (n / s / m / l / x) |
+| **Trial pruning** | `MedianPruner` kills underperforming trials early to save GPU time |
+| **Focused search mode** | Narrow the search to the highest-impact params for faster TPE convergence |
+| **Multiple optimization targets** | mAP50-95, mAP50, speed, balanced, precision, recall |
+| **Configuration presets** | One-flag quick-start templates for the most common use cases |
+| **Rich MLflow tracking** | Per-epoch curves, study progression, Optuna HTML plots, system metrics |
+| **Auto image size** | Reads your dataset and picks the right `imgsz` — not a tuned param |
+| **Rich terminal output** | Color-coded panels, trial summaries, progress bars via `rich` |
+| **Resumable studies** | SQLite / PostgreSQL storage lets you continue interrupted runs |
 
-## Installation
+---
+
+## How It Works
+
+```
+  Trial 1–5 (exploration)          Trial 6+ (exploitation)
+  ───────────────────────          ────────────────────────────────────────
+  Near-random sampling to     →    TPE splits history into "good" (top 25%)
+  collect baseline data            and "bad" trials, fits a probability
+                                   model, and proposes params where
+                                   p(good) / p(bad) is highest.
+```
+
+After only **20–50 trials**, TPE typically finds configurations that would require hundreds of random trials to stumble upon. A `MedianPruner` watches every epoch and kills trials that fall behind the running median — saving GPU hours without sacrificing quality.
+
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.9+ | 3.11 recommended |
+| PyTorch | Install separately for your CUDA version — see [pytorch.org](https://pytorch.org/get-started/locally/) |
+| NVIDIA GPU | Highly recommended; CPU training works but is slow |
+| Docker + Docker Compose | Only needed for the Docker path |
+| NVIDIA Container Toolkit | Only needed if you want GPU access inside Docker |
+
+---
+
+## Install as a Python Package
 
 ### From GitLab (recommended)
 
@@ -22,19 +94,21 @@ Automated hyperparameter optimization for YOLO models using Optuna (TPE) and MLf
 pip install git+https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
 ```
 
-### Local / development
+That's it. The `yolo-boost` command is now in your PATH.
+
+### Local / development install
 
 ```bash
 git clone https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
 cd yolo-boost
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-`-e` (editable) means changes to the source take effect immediately without reinstalling.
+The `-e` flag (editable) means any changes you make to the source take effect immediately without reinstalling.
 
-After either install, the `yolo-boost` command is available in your environment:
+### Verify
 
 ```bash
 yolo-boost --help
@@ -42,36 +116,43 @@ yolo-boost --help
 
 ---
 
-## Quick Start
+## Your First Run
 
 ### 1. Scaffold config
 
 ```bash
 yolo-boost init
 mv .env.yolo-boost.example .env.yolo-boost
-# Edit .env.yolo-boost with your settings
+# Edit .env.yolo-boost — set DATA_YAML to your dataset path
 ```
 
-### 3. Run optimization
-
-```bash
-# Quick test (5 trials, 10 epochs, small models)
-yolo-boost run --preset quick --data data.yaml
-
-# GPU, accuracy-focused
-yolo-boost run --preset accuracy --data data.yaml --device 0
-
-# Production (50 trials, persisted to DB)
-yolo-boost run --preset production --data data.yaml --device 0 --storage sqlite:///optuna.db
-```
-
-### 4. View results
+### 2. Start MLflow (in a separate terminal)
 
 ```bash
 mlflow ui
+# Open http://localhost:5000
 ```
 
-Open http://localhost:5000 to compare trials, view hyperparameter importances, and download best weights.
+### 3. Run
+
+```bash
+# Quick sanity check — 5 trials, 10 epochs, small models only
+yolo-boost run --preset quick --data data.yaml
+
+# GPU, full accuracy search
+yolo-boost run --preset accuracy --data data.yaml --device 0
+
+# Production run persisted to SQLite (resumable)
+yolo-boost run --preset production --data data.yaml --device 0 \
+  --storage sqlite:///optuna.db
+```
+
+### 4. Grab the best weights
+
+```bash
+cat best_hyperparameters.yaml          # full config
+ls runs/optuna/*/trial_*/weights/best.pt
+```
 
 ---
 
@@ -84,11 +165,11 @@ yolo-boost run --list-presets
 | Preset | Trials | Epochs | Models | Best For |
 |--------|--------|--------|--------|----------|
 | **quick** | 5 | 10 | yolo11n/s, yolo12n/s | Testing setup, fast iteration |
-| **focused** | 30 | 50 | yolo11n/s/m, yolo12n/s/m | Best TPE convergence (10 key params) |
+| **focused** | 30 | 50 | yolo11n/s/m, yolo12n/s/m | Best TPE convergence (key params only) |
 | **accuracy** | 30 | 50 | yolo11m/l/x, yolo12m/l/x | Maximum accuracy |
-| **speed** | 20 | 30 | yolo11n/s, yolo12n/s | Fast inference |
+| **speed** | 20 | 30 | yolo11n/s, yolo12n/s | Fast inference / edge deployment |
 | **balanced** | 25 | 40 | yolo11n/s/m, yolo12n/s/m | Accuracy + speed tradeoff |
-| **production** | 50 | 100 | yolo11n/s/m/l, yolo12n/s/m/l | Final optimization |
+| **production** | 50 | 100 | yolo11n/s/m/l, yolo12n/s/m/l | Final, thorough optimization |
 
 ---
 
@@ -96,7 +177,7 @@ yolo-boost run --list-presets
 
 ```
 yolo-boost init                   Scaffold .env.yolo-boost.example in current directory
-yolo-boost run [OPTIONS]          Run optimization or baseline training
+yolo-boost run [OPTIONS]          Run hyperparameter optimization or baseline training
 
 Run options:
   --preset PRESET                 Use a preset (quick/focused/accuracy/speed/balanced/production)
@@ -106,14 +187,14 @@ Run options:
   --epochs N                      Epochs per trial
   --patience N                    Early stopping patience
   --models MODEL [...]            YOLO models to search (e.g. yolo11n.pt yolo11s.pt)
-  --device DEVICE                 Training device (cpu, 0, 1, cuda:0, ...)
+  --device DEVICE                 Training device (cpu, 0, 1, cuda:0 …)
   --optimization-metric METRIC    mAP50-95 | mAP50 | precision | recall | speed | balanced
   --mlflow-uri URI                MLflow tracking URI
   --experiment NAME               MLflow experiment name
   --study-name NAME               Optuna study name
-  --storage URI                   Optuna storage for persistence (e.g. sqlite:///optuna.db)
+  --storage URI                   Optuna storage for persistence (sqlite:///optuna.db, postgresql://…)
   --run-name NAME                 Custom run name (default: auto timestamp)
-  --baseline                      Single default training run (no optimization)
+  --baseline                      Single default training run — no optimization, just a reference point
   --model MODEL                   Model for baseline run
 ```
 
@@ -123,37 +204,44 @@ Run options:
 
 ## Configuration
 
-### .env.yolo-boost
+### `.env.yolo-boost`
+
+Generate a documented template:
 
 ```bash
-# MLflow
-MLFLOW_TRACKING_URI=./mlruns
+yolo-boost init
+mv .env.yolo-boost.example .env.yolo-boost
+```
+
+Key settings:
+
+```bash
+# ── Tracking ──────────────────────────────────
+MLFLOW_TRACKING_URI=./mlruns         # or http://your-mlflow-server:5000
 MLFLOW_EXPERIMENT_NAME=yolo-optuna-boost
 
-# Data & device
+# ── Data & device ─────────────────────────────
 DATA_YAML=data.yaml
-DEVICE=cpu  # or 0, 1, cuda:0
+DEVICE=cpu                           # or 0, 1, cuda:0
 
-# Training (fixed per run — not Optuna search params)
+# ── Study ─────────────────────────────────────
 N_TRIALS=20
 EPOCHS=50
 PATIENCE=50
+OPTIMIZATION_METRIC=mAP50-95        # mAP50 | precision | recall | speed | balanced
 
-# Optimization target
-OPTIMIZATION_METRIC=mAP50-95
-
-# Search space
+# ── Search space ──────────────────────────────
 MODEL_VERSIONS=yolo11n.pt,yolo11s.pt,yolo11m.pt,yolo11l.pt
 OPTIMIZER_OPTIONS=SGD,Adam,AdamW,NAdam
 BATCH_OPTIONS=8,16,32,64
 
-# Focused search: comma-separated params to search (blank = search all 28)
-SEARCH_PARAMS=
+# ── Focused search (leave blank to search all params) ──
+SEARCH_PARAMS=lr0,optimizer,batch,box,cls,mosaic
 ```
 
 ### Hyperparameter ranges
 
-All ranges are `min,max` and can be overridden in `.env.yolo-boost`:
+All ranges are `min,max` and can be overridden:
 
 ```bash
 # Learning rate
@@ -162,7 +250,7 @@ LRF_RANGE=0.01,1.0
 MOMENTUM_RANGE=0.8,0.99
 WEIGHT_DECAY_RANGE=0.0,0.01
 
-# Loss weights (YOLO11/12 defaults: box=7.5, cls=0.5, dfl=1.5)
+# Loss weights
 BOX_RANGE=1.0,20.0
 CLS_RANGE=0.1,4.0
 DFL_RANGE=0.5,4.0
@@ -171,96 +259,58 @@ DFL_RANGE=0.5,4.0
 DEGREES_RANGE=0.0,45.0
 MOSAIC_RANGE=0.0,1.0
 ERASING_RANGE=0.0,0.9
-# ... see .env.yolo-boost.example for all 28 params
+# … see .env.yolo-boost.example for the full list
 ```
 
 ---
 
-## How It Works
+## MLflow Dashboard
 
-### TPE (Tree-structured Parzen Estimator)
+Every trial — parameters, metrics, weights, and Optuna plots — is tracked automatically.
 
-Trials 1–5 are near-random to collect baseline data. From trial 6 onward, TPE:
-
-1. Splits all completed trials into **good** (top ~25%) and **bad** (the rest)
-2. Fits a probability distribution to each group per parameter
-3. Proposes values where **p(good) / p(bad)** is highest — regions that produced good results without producing bad ones
-
-This converges to strong hyperparameters in 20–50 trials instead of thousands.
-
-### Pruning
-
-`MedianPruner` reports mAP50-95 to Optuna after every epoch. If a trial is tracking below the median of all previous trials at the same epoch (after a 10-epoch warmup), it's killed early. Saved compute is reported at the end.
-
-### Focused Search
-
-With 28 parameters, TPE needs many trials for good coverage. The `focused` preset and `SEARCH_PARAMS` env var let you narrow the search to the highest-impact parameters (e.g. `lr0, optimizer, batch, box, cls, mosaic`). Everything else holds its YOLO11/12 default.
-
-### What Gets Optimized
-
-28 parameters across 5 categories:
-- **Model & training**: model variant, optimizer, batch size
-- **Learning rate**: lr0, lrf, momentum, weight_decay, warmup_epochs, warmup_momentum, warmup_bias_lr
-- **Loss weights**: box, cls, dfl, label_smoothing
-- **Color augmentation**: hsv_h, hsv_s, hsv_v, bgr
-- **Geometric & advanced augmentation**: degrees, translate, scale, shear, perspective, flipud, fliplr, mosaic, mixup, copy_paste, erasing, close_mosaic
-
-Image size is auto-detected from your dataset — not tuned.
-
----
-
-## MLflow Structure
+```bash
+mlflow ui          # opens http://localhost:5000
+```
 
 ```
 Experiment: yolo-optuna-boost
 └── Parent run: yolo-optimization_run_20260311_120000
-    ├── Per-trial params and final metrics
-    ├── trial_mAP50_95 and best_so_far time-series (study progression)
-    ├── Optuna HTML plots (optimization_history, param_importances, ...)
+    ├── trial_mAP50_95 time-series (study progression)
+    ├── Optuna HTML plots (optimization_history, param_importances …)
     ├── System metrics (CPU, RAM, GPU)
-    ├── trial_0/   ← nested child runs
+    ├── trial_0/                    ← nested child runs
     │   ├── Per-epoch curves (mAP, losses)
-    │   ├── YOLO plots (confusion matrix, PR curve, ...)
+    │   ├── YOLO plots (confusion matrix, PR curve …)
     │   └── best.pt weights
     ├── trial_1/
-    └── ...
+    └── …
 ```
 
 ---
 
-## Examples
+## Team Collaboration
 
-### Baseline comparison
-
-```bash
-# Run default YOLO training (no optimization) for a reference point
-yolo-boost run --baseline --model yolo11m.pt --data data.yaml --epochs 50 --device 0
-```
-
-### Resume interrupted study
+### Shared Optuna study
 
 ```bash
-# SQLite storage lets you resume if interrupted
-yolo-boost run --preset production --data data.yaml --storage sqlite:///optuna.db
-```
-
-### Speed-optimized for edge deployment
-
-```bash
-yolo-boost run --preset speed --data data.yaml --device 0 --optimization-metric speed
-```
-
-### Custom run
-
-```bash
+# Everyone points at the same DB — TPE learns from all contributors
 yolo-boost run \
-  --data data.yaml \
-  --trials 15 \
-  --epochs 25 \
-  --models yolo11n.pt yolo11s.pt \
-  --device cuda:0 \
-  --run-name "experiment-v1"
+  --storage postgresql://user:pass@host:5432/optuna_db \
+  --study-name shared-study \
+  --data data.yaml
 ```
+
+### Shared MLflow server
+
+```bash
+# Server (one machine)
+mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts
+
+# Each workstation's .env.yolo-boost
+MLFLOW_TRACKING_URI=http://mlflow-server:5000
+```
+
+> Without `--serve-artifacts`, artifact uploads (weights, plots) are skipped with a warning. Metrics and params always track fine.
 
 ---
 
@@ -268,49 +318,79 @@ yolo-boost run \
 
 ```
 runs/optuna/
-└── run_20260311_120000/     # or your --run-name
+└── run_20260311_120000/            # or your --run-name
     ├── trial_0/
-    │   └── weights/best.pt
+    │   └── weights/
+    │       ├── best.pt
+    │       └── last.pt
     ├── trial_1/
-    └── ...
-best_hyperparameters.yaml    # auto-generated after each study
+    └── …
+best_hyperparameters.yaml           # auto-generated after each study
 ```
 
 ---
 
-## Team Collaboration
+## Docker
 
-**Shared Optuna DB:**
+Prefer a fully isolated environment with MLflow pre-wired? A `Dockerfile` and `docker-compose.yml` are included.
+
+### 1. Build
+
 ```bash
-yolo-boost run --storage postgresql://user:pass@host:5432/optuna_db --data data.yaml
-```
-All members contribute to the same study; TPE learns from everyone's trials.
-
-**Shared MLflow server:**
-```bash
-# Server
-mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts
-
-# .env.yolo-boost on each machine
-MLFLOW_TRACKING_URI=http://mlflow-server:5000
+git clone https://gitlab.benrachmiel.org/yalicohen389/yolo-boost.git
+cd yolo-boost
+docker compose build
 ```
 
-> Without `--serve-artifacts`, artifact uploads (weights, plots) are skipped with a warning. Metrics and params always track.
+### 2. Start MLflow
+
+```bash
+docker compose up mlflow -d
+# Open http://localhost:5000
+```
+
+### 3. Scaffold config and run
+
+```bash
+docker compose run boost init
+mv .env.yolo-boost.example .env.yolo-boost
+
+# Mount your dataset into ./data/ first, then:
+docker compose run boost run --preset quick --data /workspace/data/data.yaml
+```
+
+> **GPU inside Docker** — the `docker-compose.yml` includes the NVIDIA deploy block. Comment it out and set `DEVICE=cpu` if you're on CPU only.
 
 ---
 
 ## Troubleshooting
 
-**Too slow** → use `--preset quick` or reduce `--epochs`
+| Symptom | Fix |
+|---|---|
+| **Too slow** | Use `--preset quick` or reduce `--epochs` |
+| **Out of memory** | Set `BATCH_OPTIONS=4,8` in `.env.yolo-boost` |
+| **Models not converging** | Increase `EPOCHS`, widen `LR0_RANGE` |
+| **Stale MLflow runs** | Handled automatically on startup; or run `mlflow gc` |
+| **Interrupted study** | Re-run with the same `--storage` and `--study-name` to resume |
 
-**Out of memory** → set `BATCH_OPTIONS=4,8` in `.env.yolo-boost`
+---
 
-**Models not converging** → increase `EPOCHS`, tighten `LR0_RANGE`
+## Contributing
 
-**Stale MLflow runs** → handled automatically on startup
+1. Fork the repo and create a feature branch
+2. Test your changes with `yolo-boost run --preset quick --data data.yaml`
+3. Open a merge request — describe what you changed and why
+
+Potential areas for contribution:
+- Parallel GPU trials (`n_jobs > 1`)
+- ONNX / TensorRT auto-export of the best model
+- W&B integration as an alternative to MLflow
+- Slack / Discord webhook notifications on study completion
+- `yolo-boost compare` command for side-by-side study comparison
+- Multi-objective optimization (accuracy vs. latency Pareto front)
 
 ---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

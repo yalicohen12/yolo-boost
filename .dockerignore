@@ -1,0 +1,25 @@
+# Training outputs
+runs/
+mlruns/
+
+# Model weights (downloaded at runtime or mounted)
+*.pt
+
+# Data (mounted as a volume at runtime)
+data/
+coco8/
+
+# Python artifacts
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+
+# Secrets
+.env
+.env.yolo-boost
+
+# Git
+.git/
