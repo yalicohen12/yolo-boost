@@ -62,4 +62,4 @@ where = ["src"]
 # Non-Python files to bundle with the package.
 # This is how .env.example gets included in the installed package
 # so that `yolo-boost init` can copy it to the user's CWD.
-yolo_boost = [".env.yolo-boost.example"]
+yolo_boost = [".yolo-boost-config"]

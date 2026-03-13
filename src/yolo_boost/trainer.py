@@ -18,7 +18,7 @@ console = Console()
 # Using Path.cwd() explicitly because load_dotenv() may not resolve relative
 # paths correctly when invoked as an installed CLI entry point.
 _cwd = Path.cwd()
-load_dotenv(_cwd / '.env.yolo-boost') or load_dotenv(_cwd / '.env')
+load_dotenv(_cwd / '.yolo-boost-config') or load_dotenv(_cwd / '.env')
 
 # Disable Ultralytics' built-in MLflow integration — it conflicts with our setup
 # by registering its own callbacks on the Trainer and trying to write to /mlflow
@@ -528,7 +528,7 @@ class YOLOOptunaTrainer:
                 'n_trials_complete': n_complete,
                 'n_trials_pruned':   n_pruned,
             })
-            mlflow.log_param('best_trial_number', best_t.number)
+            mlflow.log_metric('best_trial_number', best_t.number)
             mlflow.log_params({f'best_{k}': v for k, v in study.best_params.items()})
 
             # Log per-trial final metrics as a time-series on the parent run
@@ -573,7 +573,8 @@ class YOLOOptunaTrainer:
         console.print(params_table)
 
         # Save best hyperparameters
-        best_params_path = Path.cwd() / 'best_hyperparameters.yaml'
+        best_params_path = Path.cwd() / 'runs' / 'optuna' / self.run_name / 'best_hyperparameters.yaml'
+        best_params_path.parent.mkdir(parents=True, exist_ok=True)
         with open(best_params_path, 'w') as f:
             yaml.dump(study.best_params, f, default_flow_style=False)
         console.print(f"\n[dim]Best hyperparameters saved to {best_params_path}[/dim]")

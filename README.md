@@ -122,8 +122,7 @@ yolo-boost --help
 
 ```bash
 yolo-boost init
-mv .env.yolo-boost.example .env.yolo-boost
-# Edit .env.yolo-boost — set DATA_YAML to your dataset path
+# Edit .yolo-boost-config — set DATA_YAML to your dataset path
 ```
 
 ### 2. Start MLflow (in a separate terminal)
@@ -176,7 +175,7 @@ yolo-boost run --list-presets
 ## CLI Reference
 
 ```
-yolo-boost init                   Scaffold .env.yolo-boost.example in current directory
+yolo-boost init                   Scaffold .yolo-boost-config in current directory
 yolo-boost run [OPTIONS]          Run hyperparameter optimization or baseline training
 
 Run options:
@@ -198,19 +197,18 @@ Run options:
   --model MODEL                   Model for baseline run
 ```
 
-**Priority order:** CLI flags → preset → `.env.yolo-boost` → hardcoded defaults
+**Priority order:** CLI flags → preset → `.yolo-boost-config` → hardcoded defaults
 
 ---
 
 ## Configuration
 
-### `.env.yolo-boost`
+### `.yolo-boost-config`
 
 Generate a documented template:
 
 ```bash
 yolo-boost init
-mv .env.yolo-boost.example .env.yolo-boost
 ```
 
 Key settings:
@@ -259,7 +257,7 @@ DFL_RANGE=0.5,4.0
 DEGREES_RANGE=0.0,45.0
 MOSAIC_RANGE=0.0,1.0
 ERASING_RANGE=0.0,0.9
-# … see .env.yolo-boost.example for the full list
+# … see .yolo-boost-config for the full list
 ```
 
 ---
@@ -306,7 +304,7 @@ yolo-boost run \
 # Server (one machine)
 mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts
 
-# Each workstation's .env.yolo-boost
+# Each workstation's .yolo-boost-config
 MLFLOW_TRACKING_URI=http://mlflow-server:5000
 ```
 
@@ -353,7 +351,6 @@ docker compose up mlflow -d
 
 ```bash
 docker compose run boost init
-mv .env.yolo-boost.example .env.yolo-boost
 
 # Mount your dataset into ./data/ first, then:
 docker compose run boost run --preset quick --data /workspace/data/data.yaml
@@ -368,7 +365,7 @@ docker compose run boost run --preset quick --data /workspace/data/data.yaml
 | Symptom | Fix |
 |---|---|
 | **Too slow** | Use `--preset quick` or reduce `--epochs` |
-| **Out of memory** | Set `BATCH_OPTIONS=4,8` in `.env.yolo-boost` |
+| **Out of memory** | Set `BATCH_OPTIONS=4,8` in `.yolo-boost-config` |
 | **Models not converging** | Increase `EPOCHS`, widen `LR0_RANGE` |
 | **Stale MLflow runs** | Handled automatically on startup; or run `mlflow gc` |
 | **Interrupted study** | Re-run with the same `--storage` and `--study-name` to resume |

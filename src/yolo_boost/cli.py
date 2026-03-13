@@ -15,32 +15,33 @@ from rich.table import Table
 
 console = Console()
 
+CONFIG_FILE = '.yolo-boost-config'
+
 
 def cmd_init(args):
-    """Write .env.example to the current directory so users know what to configure."""
-    dest = Path('.env.yolo-boost.example')
+    """Write a config template to the current directory."""
+    dest = Path(CONFIG_FILE)
     if dest.exists() and not args.force:
         console.print(f"[yellow]{dest}[/yellow] already exists. Use [bold]--force[/bold] to overwrite.")
         return
 
-    template = Path(__file__).parent / '.env.yolo-boost.example'
+    template = Path(__file__).parent / CONFIG_FILE
     shutil.copy(template, dest)
     console.print(f"[green]Created[/green] {dest}")
-    console.print("Edit it with your settings, then rename it:")
-    console.print(f"  [cyan]mv .env.yolo-boost.example .env.yolo-boost[/cyan]")
+    console.print(f"Edit it with your settings, then run [cyan]yolo-boost run --preset quick --data data.yaml[/cyan]")
 
 
 def cmd_run(args):
     """Run a hyperparameter optimization study or baseline training."""
-    # Warn if running with no preset and no .env.yolo-boost — defaults are very aggressive
-    if not args.preset and not Path('.env.yolo-boost').exists():
+    # Warn if running with no preset and no config file — defaults are very aggressive
+    if not args.preset and not Path(CONFIG_FILE).exists():
         console.print(Panel(
-            "[yellow]No preset and no .env.yolo-boost found.[/yellow]\n"
-            "Running with defaults: [bold]20 trials × 50 epochs[/bold], 8 model sizes,\n"
-            "all 28 hyperparameters searched. This will take a long time.\n\n"
+            f"[yellow]No preset and no {CONFIG_FILE} found.[/yellow]\n"
+            "Running with defaults: [bold]20 trials × 50 epochs[/bold], many model sizes.\n"
+            "This will take a long time.\n\n"
             "[bold]Quick start options:[/bold]\n"
             "  [cyan]yolo-boost run --preset quick --data data.yaml[/cyan]\n"
-            "  [cyan]yolo-boost init  # then edit .env.yolo-boost[/cyan]",
+            f"  [cyan]yolo-boost init  # then edit {CONFIG_FILE}[/cyan]",
             title="[bold yellow]Warning[/bold yellow]",
             border_style="yellow",
         ))
@@ -94,12 +95,12 @@ def cmd_run(args):
         if args.preset:
             table.add_row("Preset", args.preset)
         table.add_row("Run Name", trainer.run_name)
-        table.add_row("Model", args.model if args.model else "from .env (first in list)")
+        table.add_row("Model", args.model if args.model else "from config (first in list)")
         table.add_row("Data", args.data)
-        table.add_row("Epochs", str(args.epochs) if args.epochs else "from .env")
+        table.add_row("Epochs", str(args.epochs) if args.epochs else "from config")
         table.add_row("MLflow URI", trainer.mlflow_tracking_uri)
         table.add_row("Experiment", str(args.experiment))
-        table.add_row("Device", args.device if args.device else "from .env")
+        table.add_row("Device", args.device if args.device else "from config")
         console.print(Panel(table, title="[bold blue] YOLO Baseline Training [/bold blue]", border_style="blue"))
         console.print(f"\nResults will be saved to: [cyan]runs/optuna/{trainer.run_name}/[/cyan]")
 
@@ -111,7 +112,7 @@ def cmd_run(args):
         return
 
     # Optimization mode — print all resolved config before starting
-    search_params = ', '.join(sorted(trainer.search_params)) if trainer.search_params else 'all (28 params)'
+    search_params = ', '.join(sorted(trainer.search_params)) if trainer.search_params else 'all'
 
     table = Table(show_header=False, box=None, padding=(0, 1), show_edge=False)
     table.add_column(style="bold cyan", no_wrap=True, min_width=16)
@@ -163,9 +164,9 @@ def build_parser():
         epilog="""
 New to yolo-boost? Start here:
   1. Run `yolo-boost init` in your project directory.
-     This writes a .env.yolo-boost.example file that documents every config
+     This creates a .yolo-boost-config file that documents every config
      option (MLflow URI, device, model sizes, search ranges, etc.).
-     Edit it, then rename it to .env.yolo-boost.
+     Edit it with your settings.
 
   2. Run `yolo-boost run --preset quick --data your_data.yaml`
      Presets are the easiest way to get started — they set sensible values
@@ -178,7 +179,6 @@ New to yolo-boost? Start here:
 Example (first time):
   cd my-project/
   yolo-boost init
-  mv .env.yolo-boost.example .env.yolo-boost
   yolo-boost run --preset quick --data data.yaml
   mlflow ui
 """,
@@ -188,15 +188,15 @@ Example (first time):
     # ── init ──────────────────────────────────────────────────────────────
     init_parser = subparsers.add_parser(
         'init',
-        help='Scaffold a .env.example in the current directory',
+        help=f'Create a {CONFIG_FILE} config file in the current directory',
         description=(
-            'Write a .env.yolo-boost.example template to the current directory.\n'
+            f'Write a {CONFIG_FILE} template to the current directory.\n'
             'It documents every config option with sensible defaults.\n'
-            'Edit it, then rename: mv .env.yolo-boost.example .env.yolo-boost'
+            'Edit it with your settings and you\'re ready to go.'
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    init_parser.add_argument('--force', action='store_true', help='Overwrite existing .env.example')
+    init_parser.add_argument('--force', action='store_true', help=f'Overwrite existing {CONFIG_FILE}')
 
     # ── run ───────────────────────────────────────────────────────────────
     run_parser = subparsers.add_parser(
