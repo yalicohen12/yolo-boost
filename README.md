@@ -29,6 +29,7 @@ yolo-boost run --preset accuracy --data data.yaml --device 0
 - [How It Works](#how-it-works)
 - [Prerequisites](#prerequisites)
 - [Install as a Python Package](#install-as-a-python-package)
+- [Docker](#docker)
 - [Your First Run](#your-first-run)
 - [Presets](#presets)
 - [CLI Reference](#cli-reference)
@@ -36,7 +37,6 @@ yolo-boost run --preset accuracy --data data.yaml --device 0
 - [MLflow Dashboard](#mlflow-dashboard)
 - [Team Collaboration](#team-collaboration)
 - [Output Structure](#output-structure)
-- [Docker](#docker)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -113,6 +113,38 @@ The `-e` flag (editable) means any changes you make to the source take effect im
 ```bash
 yolo-boost --help
 ```
+
+---
+
+## Docker
+
+Prefer a fully isolated environment with MLflow pre-wired? A `Dockerfile` and `docker-compose.yml` are included.
+
+### 1. Build
+
+```bash
+git clone https://github.com/yalicohen12/yolo-boost.git
+cd yolo-boost
+docker compose build
+```
+
+### 2. Start MLflow
+
+```bash
+docker compose up mlflow -d
+# Open http://localhost:5000
+```
+
+### 3. Scaffold config and run
+
+```bash
+docker compose run boost init
+
+# Mount your dataset into ./data/ first, then:
+docker compose run boost run --preset quick --data /workspace/data/data.yaml
+```
+
+> **GPU inside Docker** — the `docker-compose.yml` includes the NVIDIA deploy block. Comment it out and set `DEVICE=cpu` if you're on CPU only.
 
 ---
 
@@ -325,38 +357,6 @@ runs/optuna/
     └── …
 best_hyperparameters.yaml           # auto-generated after each study
 ```
-
----
-
-## Docker
-
-Prefer a fully isolated environment with MLflow pre-wired? A `Dockerfile` and `docker-compose.yml` are included.
-
-### 1. Build
-
-```bash
-git clone https://github.com/yalicohen12/yolo-boost.git
-cd yolo-boost
-docker compose build
-```
-
-### 2. Start MLflow
-
-```bash
-docker compose up mlflow -d
-# Open http://localhost:5000
-```
-
-### 3. Scaffold config and run
-
-```bash
-docker compose run boost init
-
-# Mount your dataset into ./data/ first, then:
-docker compose run boost run --preset quick --data /workspace/data/data.yaml
-```
-
-> **GPU inside Docker** — the `docker-compose.yml` includes the NVIDIA deploy block. Comment it out and set `DEVICE=cpu` if you're on CPU only.
 
 ---
 
