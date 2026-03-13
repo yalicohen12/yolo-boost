@@ -1,7 +1,7 @@
 # ============================================================================
 # YOLO Boost Configuration
 # ============================================================================
-# Rename this file: mv .env.yolo-boost.example .env.yolo-boost
+# Edit this file, then run: yolo-boost run --preset quick --data data.yaml
 # CLI flags always override these values.
 # ============================================================================
 
