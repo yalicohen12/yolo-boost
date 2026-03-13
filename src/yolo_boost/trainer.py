@@ -510,6 +510,7 @@ class YOLOOptunaTrainer:
                 self.objective,
                 n_trials=n_trials,
                 callbacks=[self._trial_callback],
+                catch=(Exception,),
             )
 
             # Log best trial's metrics as plain scalars — these show as columns
