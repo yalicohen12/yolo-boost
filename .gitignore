@@ -185,3 +185,15 @@ checkpoints/
 # ============================================================================
 # Uncomment if using Git LFS
 # *.psd filter=lfs diff=lfs merge=lfs -text
+
+# Dataset config — project specific, not for repo
+data.yaml
+
+# Internal docs
+CODEBASE.md
+
+# Leftover env template
+.env.example
+
+# MLflow-specific Dockerfile (not part of public setup)
+Dockerfile.mlflow
