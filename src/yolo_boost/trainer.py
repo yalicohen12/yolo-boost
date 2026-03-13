@@ -515,9 +515,19 @@ class YOLOOptunaTrainer:
 
             # Log best trial's metrics as plain scalars — these show as columns
             # in the MLflow experiment table, making runs comparable at a glance
-            best_t = study.best_trial
             n_complete = sum(1 for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE)
             n_pruned   = sum(1 for t in study.trials if t.state == optuna.trial.TrialState.PRUNED)
+
+            if n_complete == 0:
+                console.print(Panel(
+                    "[red]All trials failed — no completed trials to report.[/red]\n"
+                    "Check that your [bold]--data[/bold] path is correct and images are accessible.",
+                    title="[bold red]Study Failed[/bold red]",
+                    border_style="red",
+                ))
+                return study
+
+            best_t = study.best_trial
             mlflow.log_metrics({
                 'best_mAP50':        best_t.user_attrs.get('mAP50', 0),
                 'best_mAP50_95':     best_t.user_attrs.get('mAP50_95', 0),
