@@ -2,7 +2,7 @@
 #
 # Usage:
 #   docker compose up mlflow          # start the MLflow UI only
-#   docker compose run boost init     # scaffold .env.yolo-boost.example
+#   docker compose run boost init     # scaffold .yolo-boost-config
 #   docker compose run boost run --preset quick --data /workspace/data/data.yaml
 #
 # Mount your dataset at ./data/ before running.
@@ -34,7 +34,7 @@ services:
       # Point at the MLflow container — override in .env if using an external server
       MLFLOW_TRACKING_URI: http://mlflow:5000
     env_file:
-      - .env.yolo-boost       # created by `yolo-boost init`
+      - .yolo-boost-config    # created by `yolo-boost init`
     volumes:
       - ./data:/workspace/data       # your dataset (read-only is fine)
       - ./runs:/workspace/runs       # YOLO training outputs + best.pt weights

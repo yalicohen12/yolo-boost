@@ -162,6 +162,8 @@ yolo-boost init
 # Edit .yolo-boost-config — set DATA_YAML to your dataset path
 ```
 
+> **Tip:** Use an **absolute path** for `path` inside your `data.yaml`. Ultralytics resolves relative paths from its own `datasets_dir`, not from where your `data.yaml` lives, which can cause "images not found" errors.
+
 ### 2. Start MLflow (in a separate terminal)
 
 ```bash
@@ -256,7 +258,7 @@ MLFLOW_TRACKING_URI=./mlruns         # or http://your-mlflow-server:5000
 MLFLOW_EXPERIMENT_NAME=yolo-optuna-boost
 
 # ── Data & device ─────────────────────────────
-DATA_YAML=data.yaml
+DATA_YAML=/absolute/path/to/data.yaml   # use an absolute path
 DEVICE=cpu                           # or 0, 1, cuda:0
 
 # ── Study ─────────────────────────────────────

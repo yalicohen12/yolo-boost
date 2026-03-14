@@ -7,6 +7,7 @@ from yolo_boost.presets import get_preset, list_presets, PRESETS
 import argparse
 import os
 import shutil
+import time
 from pathlib import Path
 
 from rich.console import Console
@@ -104,6 +105,17 @@ def cmd_run(args):
         console.print(Panel(table, title="[bold blue] YOLO Baseline Training [/bold blue]", border_style="blue"))
         console.print(f"\nResults will be saved to: [cyan]runs/optuna/{trainer.run_name}/[/cyan]")
 
+        if args.dry_run:
+            console.print(Panel(
+                f"[green]Config and dataset look good.[/green]\n"
+                f"Would run [bold]1 baseline trial[/bold] × [bold]{trainer.epochs} epochs[/bold] "
+                f"on [bold]{args.model or trainer.model_versions[0]}[/bold].\n\n"
+                "[dim]Remove --dry-run to start training.[/dim]",
+                title="[bold green] Dry Run Complete [/bold green]",
+                border_style="green",
+            ))
+            return
+
         trainer.train_baseline(model_name=args.model, epochs=args.epochs)
 
         console.print("\n[bold green]Baseline training complete![/bold green]")
@@ -140,6 +152,20 @@ def cmd_run(args):
     table.add_row("Experiment", trainer.experiment_name)
     table.add_row("Output dir", f"runs/optuna/{trainer.run_name}/")
     console.print(Panel(table, title="[bold blue] YOLO Boost — Hyperparameter Optimization [/bold blue]", border_style="blue"))
+
+    if args.dry_run:
+        console.print(Panel(
+            f"[green]Config and dataset look good.[/green]\n"
+            f"Would run [bold]{args.trials} trials[/bold] × [bold]{trainer.epochs} epochs[/bold] "
+            f"across [bold]{len(trainer.model_versions)} model(s)[/bold], "
+            f"optimizing for [bold]{trainer.optimization_metric}[/bold].\n\n"
+            "[dim]Remove --dry-run to start training.[/dim]",
+            title="[bold green] Dry Run Complete [/bold green]",
+            border_style="green",
+        ))
+        return
+
+    time.sleep(2)
 
     study = trainer.optimize(
         n_trials=args.trials,
@@ -254,6 +280,8 @@ Examples:
                             help='Metric to optimize (mAP50, mAP50-95, speed, balanced)')
     run_parser.add_argument('--run-name', type=str, default=None,
                             help='Custom run name (default: auto-generated timestamp)')
+    run_parser.add_argument('--dry-run', action='store_true',
+                            help='Validate config and dataset, print resolved settings, then exit without training')
 
     return parser
 
