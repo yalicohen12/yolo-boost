@@ -21,6 +21,10 @@ Instead of manually tuning hyperparameters, you run one command and let Bayesian
 yolo-boost run --preset accuracy --data data.yaml --device 0
 ```
 
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/06f304e8-c0a9-4557-a4cb-d6e2a785b8d6" alt="yolo-boost demo" width="900"/>
+</div>
+
 ---
 
 ## Table of Contents
@@ -37,6 +41,7 @@ yolo-boost run --preset accuracy --data data.yaml --device 0
 - [MLflow Dashboard](#mlflow-dashboard)
 - [Team Collaboration](#team-collaboration)
 - [Output Structure](#output-structure)
+- [Offline Usage](#offline-usage)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -157,10 +162,12 @@ yolo-boost init
 # Edit .yolo-boost-config — set DATA_YAML to your dataset path
 ```
 
+> **Tip:** Use an **absolute path** for `path` inside your `data.yaml`. Ultralytics resolves relative paths from its own `datasets_dir`, not from where your `data.yaml` lives, which can cause "images not found" errors.
+
 ### 2. Start MLflow (in a separate terminal)
 
 ```bash
-mlflow ui
+mlflow ui --backend-store-uri ./mlruns --serve-artifacts --host 0.0.0.0 --port 5000
 # Open http://localhost:5000
 ```
 
@@ -251,7 +258,7 @@ MLFLOW_TRACKING_URI=./mlruns         # or http://your-mlflow-server:5000
 MLFLOW_EXPERIMENT_NAME=yolo-optuna-boost
 
 # ── Data & device ─────────────────────────────
-DATA_YAML=data.yaml
+DATA_YAML=/absolute/path/to/data.yaml   # use an absolute path
 DEVICE=cpu                           # or 0, 1, cuda:0
 
 # ── Study ─────────────────────────────────────
@@ -299,8 +306,17 @@ ERASING_RANGE=0.0,0.9
 Every trial — parameters, metrics, weights, and Optuna plots — is tracked automatically.
 
 ```bash
-mlflow ui          # opens http://localhost:5000
+mlflow ui \
+  --backend-store-uri ./mlruns \
+  --serve-artifacts \
+  --host 0.0.0.0 \
+  --port 5000
 ```
+
+Open **http://localhost:5000**.
+
+> `--serve-artifacts` is required for artifact uploads (weights, plots) to work. Without it they are skipped silently.
+> `--backend-store-uri` must match `MLFLOW_TRACKING_URI` in your `.yolo-boost-config`. Both default to `./mlruns`.
 
 ```
 Experiment: yolo-optuna-boost
@@ -360,6 +376,51 @@ best_hyperparameters.yaml           # auto-generated after each study
 
 ---
 
+## Offline Usage
+
+By default, Ultralytics downloads model weights the first time you reference them (e.g. `yolo11n.pt`). To run fully offline, download the weights once and point yolo-boost at the local files.
+
+### 1. Download weights once (while online)
+
+```bash
+# Let Ultralytics pull them into your CWD
+yolo predict model=yolo11n.pt source=. 2>/dev/null || true
+yolo predict model=yolo11s.pt source=. 2>/dev/null || true
+# repeat for any model you need
+```
+
+Or just copy `.pt` files you already have from elsewhere.
+
+### 2. Run offline
+
+**Option A — place `.pt` files in your working directory:**
+
+```bash
+ls .
+# yolo11n.pt  yolo11s.pt  data.yaml  .yolo-boost-config
+
+yolo-boost run --preset quick --data data.yaml
+# Ultralytics finds them in CWD — no download
+```
+
+**Option B — pass full paths (recommended for a shared weights folder):**
+
+```bash
+yolo-boost run \
+  --models /shared/weights/yolo11n.pt /shared/weights/yolo11s.pt \
+  --data data.yaml
+```
+
+Or set it permanently in `.yolo-boost-config`:
+
+```bash
+MODEL_VERSIONS=/shared/weights/yolo11n.pt,/shared/weights/yolo11s.pt
+```
+
+> Ultralytics only attempts a download when the model name has no path component and the file isn't found in the CWD. A full path always loads locally.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -369,6 +430,8 @@ best_hyperparameters.yaml           # auto-generated after each study
 | **Models not converging** | Increase `EPOCHS`, widen `LR0_RANGE` |
 | **Stale MLflow runs** | Handled automatically on startup; or run `mlflow gc` |
 | **Interrupted study** | Re-run with the same `--storage` and `--study-name` to resume |
+| **Images not found** | Set `path` in your `data.yaml` to an absolute path — Ultralytics resolves relative paths from its own `datasets_dir`, not from where your `data.yaml` lives |
+| **Models downloading every run** | Place `.pt` files in your CWD, or pass full paths: `--models /path/to/yolo11n.pt` (or set `MODEL_VERSIONS=/path/to/yolo11n.pt` in `.yolo-boost-config`). Ultralytics only downloads if the file isn't found locally |
 
 ---
 

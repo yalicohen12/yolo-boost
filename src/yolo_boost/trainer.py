@@ -4,6 +4,7 @@ from ultralytics import YOLO
 import yaml
 from pathlib import Path
 import os
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -13,6 +14,10 @@ from rich.table import Table
 from rich.rule import Rule
 
 console = Console()
+
+# Suppress MLflow's file-store deprecation warning — it fires on every run and
+# clutters the terminal before our config panel is printed.
+logging.getLogger('mlflow.store.tracking.file_store').setLevel(logging.ERROR)
 
 # Load yolo-boost specific env file from CWD, falling back to plain .env
 # Using Path.cwd() explicitly because load_dotenv() may not resolve relative
@@ -140,6 +145,19 @@ class YOLOOptunaTrainer:
         self.experiment_name = experiment_name or os.getenv('MLFLOW_EXPERIMENT_NAME', 'yolo-optuna-boost')
         self.device = device or os.getenv('DEVICE', 'cpu')
         self.optimization_metric = optimization_metric or os.getenv('OPTIMIZATION_METRIC', 'mAP50-95')
+
+        _valid_metrics = {'mAP50', 'mAP50-95', 'precision', 'recall', 'speed', 'balanced'}
+        if self.optimization_metric not in _valid_metrics:
+            raise ValueError(
+                f"Invalid optimization metric '{self.optimization_metric}'. "
+                f"Choose from: {', '.join(sorted(_valid_metrics))}"
+            )
+
+        if not Path(self.data_yaml).exists():
+            raise FileNotFoundError(
+                f"data.yaml not found: '{self.data_yaml}'\n"
+                f"Set the correct path with --data or DATA_YAML in .yolo-boost-config."
+            )
 
         # Generate unique run name if not provided (timestamp-based)
         if run_name is None:
@@ -510,13 +528,24 @@ class YOLOOptunaTrainer:
                 self.objective,
                 n_trials=n_trials,
                 callbacks=[self._trial_callback],
+                catch=(Exception,),
             )
 
             # Log best trial's metrics as plain scalars — these show as columns
             # in the MLflow experiment table, making runs comparable at a glance
-            best_t = study.best_trial
             n_complete = sum(1 for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE)
             n_pruned   = sum(1 for t in study.trials if t.state == optuna.trial.TrialState.PRUNED)
+
+            if n_complete == 0:
+                console.print(Panel(
+                    "[red]All trials failed — no completed trials to report.[/red]\n"
+                    "Check that your [bold]--data[/bold] path is correct and images are accessible.",
+                    title="[bold red]Study Failed[/bold red]",
+                    border_style="red",
+                ))
+                return study
+
+            best_t = study.best_trial
             mlflow.log_metrics({
                 'best_mAP50':        best_t.user_attrs.get('mAP50', 0),
                 'best_mAP50_95':     best_t.user_attrs.get('mAP50_95', 0),
