@@ -21,6 +21,10 @@ Instead of manually tuning hyperparameters, you run one command and let Bayesian
 yolo-boost run --preset accuracy --data data.yaml --device 0
 ```
 
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/932d46b8-1201-4c69-be7b-69779cec6766" alt="yolo-boost demo" width="900"/>
+</div>
+
 ---
 
 ## Table of Contents
