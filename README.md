@@ -22,7 +22,7 @@ yolo-boost run --preset accuracy --data data.yaml --device 0
 ```
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/932d46b8-1201-4c69-be7b-69779cec6766" alt="yolo-boost demo" width="900"/>
+  <img src="https://github.com/user-attachments/assets/06f304e8-c0a9-4557-a4cb-d6e2a785b8d6" alt="yolo-boost demo" width="900"/>
 </div>
 
 ---
