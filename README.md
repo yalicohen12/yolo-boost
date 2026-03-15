@@ -58,8 +58,7 @@ yolo-boost run --preset accuracy --data data.yaml --device 0
 | **Multiple optimization targets** | mAP50-95, mAP50, speed, balanced, precision, recall |
 | **Configuration presets** | One-flag quick-start templates for the most common use cases |
 | **Rich MLflow tracking** | Per-epoch curves, study progression, Optuna HTML plots, system metrics |
-| **Auto image size** | Reads your dataset and picks the right `imgsz` — not a tuned param |
-| **Rich terminal output** | Color-coded panels, trial summaries, progress bars via `rich` |
+
 | **Resumable studies** | SQLite / PostgreSQL storage lets you continue interrupted runs |
 
 ---
